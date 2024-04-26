@@ -18,6 +18,7 @@ class MedlineCoocGraph:
         
         self.pmid_to_cui_list_flist = None
         self.pmid_to_ts_dict = None
+        self.cut_year = None
         
         # dict restriction
         self.pref_st_set = set()
@@ -43,7 +44,8 @@ class MedlineCoocGraph:
         fname,
         idx=0,
         title='include',
-        verbose=False
+        verbose=False,
+        cut_date=None,
     ):
 
         title_options = ['include', 'only', 'exclude']
@@ -54,6 +56,12 @@ class MedlineCoocGraph:
             )
 
         fname = Path(fname)
+        
+        if cut_date:
+            assert len(cut_date) == 4
+            self.cut_year = cut_date
+        else:
+            self.cut_year = 3000
 
         sent_id_to_terms_dict = defaultdict(str)
         pmid_to_date_dict = dict()
@@ -71,16 +79,18 @@ class MedlineCoocGraph:
                 line_split = line.strip().split(':')
                 if len(line_split) == 4:
                     ts, pmid, sent_idx, cui_list = line_split
+                    
+                    pmid_year = ts.split('-')[0]
+                    if pmid_year <= self.cut_year:
+                        #sent_id = f'{pmid}_{sent_idx}'
+                        if int(sent_idx) == 0:
+                            if title!='exclude':
+                                sent_id_to_terms_dict[pmid] += f'{cui_list} '
+                        else:
+                            if title != 'only':
+                                sent_id_to_terms_dict[pmid] += f'{cui_list} '
 
-                    #sent_id = f'{pmid}_{sent_idx}'
-                    if int(sent_idx) == 0:
-                        if title!='exclude':
-                            sent_id_to_terms_dict[pmid] += f'{cui_list} '
-                    else:
-                        if title != 'only':
-                            sent_id_to_terms_dict[pmid] += f'{cui_list} '
-
-                    pmid_to_date_dict[pmid] = ts.split('-')[0]
+                        pmid_to_date_dict[pmid] = pmid_year
 
         return sent_id_to_terms_dict, pmid_to_date_dict
     
@@ -90,7 +100,8 @@ class MedlineCoocGraph:
         title_option,
         n_jobs,
         st_dict=None,
-        pref_st_set=None
+        pref_st_set=None,
+        cut_date=None,
     ) -> None:
         if self.verbose:
             print(f'Titles: {title_option}')
@@ -111,12 +122,16 @@ class MedlineCoocGraph:
 
                 self.pref_st_set = pref_st_set
                 self.pref_cui_terms_set = pref_cui_terms_set
+                
+        if self.verbose:
+            print(f'Selected cut date: {cut_date}')
         
         res_par_list = Parallel(n_jobs=n_jobs)(
             delayed(self.process_ts_pmids_chunk)(
                 fname, idx,
                 verbose=True,
                 title=title_option,
+                cut_date=cut_date,
             ) for idx, fname in enumerate(ts_pmids_flist)
         )
 
@@ -238,6 +253,7 @@ class MedlineCoocGraph:
         n_jobs=1,
         st_dict=None,
         pref_st_set=None,
+        cut_date=None,
     ) -> None:
         """
         title_options = ['include', 'only', 'exclude']
@@ -249,6 +265,7 @@ class MedlineCoocGraph:
             n_jobs=n_jobs,
             st_dict=st_dict,
             pref_st_set=pref_st_set,
+            cut_date=cut_date,
         )
         self.construct_doc_term_csr()
         self.compute_tt_matrix()
@@ -320,6 +337,23 @@ class MedlineCoocGraph:
             )
         )
         return terms_cui_list
+    
+    def contains_cooc(self, t1, t2) -> bool:
+        """
+        Given a pair t1, t2,
+        returns:
+        True if a pair has corresponding PMIDs
+        False otherwise
+        """
+        
+        t1_idx = self.cui_to_int_idx_dict.get(t1)
+        t2_idx = self.cui_to_int_idx_dict.get(t2)
+        
+        if t1_idx and t2_idx:
+            #print(t1_idx, t2_idx)
+            return self.tt_matrix_csr[t1_idx, t2_idx]
+        
+        return False
       
     def load_graph(self, save_fname) -> None:
         if self.verbose:
