@@ -47,3 +47,6 @@ class MedlineNumpyEmbeddings:
 
     def __len__(self):
         return len(self.pmid_to_str_idx_dict)
+    
+    def __contains__(self, pmid):
+        return pmid in self.pmid_to_str_idx_dict
