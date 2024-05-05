@@ -17,6 +17,7 @@ class MedlineCoocGraph:
         self.n_jobs = 1 # for parallel file reading only
         
         self.pmid_to_cui_list_flist = None
+        self.pmid_to_cui_list_dict = None
         self.pmid_to_ts_dict = None
         self.cut_year = None
         
@@ -61,7 +62,7 @@ class MedlineCoocGraph:
             assert len(cut_date) == 4
             self.cut_year = cut_date
         else:
-            self.cut_year = 3000
+            self.cut_year = '3000'
 
         sent_id_to_terms_dict = defaultdict(str)
         pmid_to_date_dict = dict()
@@ -379,6 +380,7 @@ class MedlineCoocGraph:
             'pref_st_set': self.pref_st_set,
             'pref_cui_terms_set': self.pref_cui_terms_set,
             'pmid_to_ts_dict': self.pmid_to_ts_dict,
+            'pmid_to_cui_list_dict': self.pmid_to_cui_list_dict,
             'cui_to_int_idx_dict': self.cui_to_int_idx_dict,
             'int_idx_to_cui_list': self.int_idx_to_cui_list,
             'pmid_to_int_idx_dict': self.pmid_to_int_idx_dict,
