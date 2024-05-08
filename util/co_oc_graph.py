@@ -411,6 +411,33 @@ class MedlineCoocGraph:
         
         return None
     
+    def find_shortest_paths_idxs_old(
+        self,
+        source,
+        target,
+        lengths_list=[3,4],
+    ) -> list:
+        """
+        Finds all shortest paths between
+        `source` and `target`
+        of lengths `lengths_list`
+        """
+        
+        assert self.graph_gt is not None, "graph-tool object is not found. Please, run .construct_gt_network() first."
+        
+        source_idx = self.cui_to_int_idx_dict[source]
+        target_idx = self.cui_to_int_idx_dict[target]
+        
+        all_sp_gt = gt.all_shortest_paths(
+            g=self.graph_gt,
+            source=source_idx,
+            target=target_idx,
+        )
+
+        all_sp_gt = set(tuple(p.tolist()) for p in all_sp_gt)
+        
+        return list(all_sp_gt)
+    
     def find_shortest_paths_idxs(
         self,
         source,
@@ -428,15 +455,43 @@ class MedlineCoocGraph:
         source_idx = self.cui_to_int_idx_dict[source]
         target_idx = self.cui_to_int_idx_dict[target]
         
-        all_sp_gt = gt.all_shortest_paths(
-            g=self.graph_gt,
-            source=source_idx,
-            target=target_idx,
+        cur_mask_np = np.ones(self.graph_gt.num_vertices(), dtype=bool)
+        cur_mask_gt = self.graph_gt.new_vp(
+            "bool",
+            vals = cur_mask_np
         )
+        self.graph_gt.set_vertex_filter(cur_mask_gt)
 
-        all_sp_gt = set(tuple(p.tolist()) for p in all_sp_gt)
+        sps_dict = dict()
+
+        for i in lengths_list:
+            all_sp_gt = gt.all_shortest_paths(
+                g=self.graph_gt,
+                source=source_idx,
+                target=target_idx,
+            )
+
+            all_sp_gt = [tuple(p.tolist()) for p in all_sp_gt]
+
+            sps_dict[i] = all_sp_gt
+
+            nodes_to_exclude_set = set()
+            for path in all_sp_gt:
+                nodes_to_exclude_set.update(path)
+            nodes_to_exclude_set.discard(source_idx)
+            nodes_to_exclude_set.discard(target_idx)
+
+            cur_mask_gt.a[list(nodes_to_exclude_set)] = 0
         
-        return list(all_sp_gt)
+        self.graph_gt.set_vertex_filter(None)
+        
+        all_sp_gt_set_list = []
+        for k, path_list in sps_dict.items():
+            all_sp_gt_set_list += path_list
+        
+        all_sp_gt_set_list = list(set(all_sp_gt_set_list))
+        
+        return all_sp_gt_set_list
     
     def decode_shortest_paths(
         self,
