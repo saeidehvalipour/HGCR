@@ -7,7 +7,6 @@ from datetime import datetime
 
 import pandas as pd
 from tqdm import tqdm
-from agatha.util.matrix_lookup import np_emb_lookup_table
 import json
 import torch
 
@@ -17,7 +16,8 @@ from torch.utils.data import Dataset, DataLoader
 
 from collections import defaultdict
 
-from util.emb_lookup.medcpt_np_lookup import MedCPTNumpyEmbeddings
+from util.emb_lookup.medcpt_emb_lookup import MedCPTNumpyEmbeddings
+from util.emb_lookup.node_emb_lookup import np_emb_lookup_table
 
 class PathContextRetrieval():
     def __init__(self, config_path):
@@ -167,10 +167,15 @@ class PathContextRetrieval():
         target_cui,
         n_eval_runs=5,
         sampling_rate_abstr_per_edge=None,
+        n_paths_sample_size=None,
     ):
         
         short_paths_list = self.find_shortest_paths(source_cui, target_cui)
         filt_short_paths_list = self.filter_shortest_paths(short_paths_list)
+        
+        if n_paths_sample_size:
+            if len(filt_short_paths_list) > n_paths_sample_size:
+                filt_short_paths_list = random.sample(filt_short_paths_list, n_paths_sample_size)
         
         sp_and_score_list = []
 
@@ -181,11 +186,14 @@ class PathContextRetrieval():
 
             p_dict = dict()
             p_dict['path'] = p
+            
+            try:
+                for i in range(n_eval_runs):
+                    p_dict[f'run_{i}'] = self.eval_single_path(p, sampling_rate_abstr_per_edge)
 
-            for i in range(n_eval_runs):
-                p_dict[f'run_{i}'] = self.eval_single_path(p, sampling_rate_abstr_per_edge)
-
-            sp_and_score_list.append(p_dict)
+                sp_and_score_list.append(p_dict)
+            except Exception as e:
+                print(f'Exception: {e} for path: {p}')
             
         sp_and_score_df = pd.DataFrame(sp_and_score_list)
         sp_and_score_df['score_std'] = sp_and_score_df.drop('path', axis=1).std(axis=1)
