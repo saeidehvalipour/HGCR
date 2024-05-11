@@ -94,11 +94,17 @@ class ContextDataset(Dataset):
         
         cur_neg_paths_list = cur_pair['neg_sp']
         
-        if len(cur_neg_paths_list) > self.negs_per_pos:
-            cur_neg_paths_list = random.sample(
-                cur_pair['neg_sp'],
-                self.negs_per_pos
-            )
+        # if len(cur_neg_paths_list) > self.negs_per_pos:
+        #     cur_neg_paths_list = random.sample(
+        #         cur_pair['neg_sp'],
+        #         self.negs_per_pos
+        #     )
+        
+        # sampling with repetitions 
+        cur_neg_paths_list = random.choices(
+            cur_pair['neg_sp'],
+            k=self.negs_per_pos
+        )
             
         
         for i in range(self.negs_per_pos):
