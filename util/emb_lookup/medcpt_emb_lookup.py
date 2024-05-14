@@ -8,8 +8,15 @@ class MedCPTNumpyEmbeddings:
     def __init__(
         self,
         medcpt_fpath,
-        json_read_n_jobs=1,
+        read_n_jobs=1,
+        memmap=True
     ):
+        
+        self.memmap = None
+        if memmap:
+            self.memmap = 'r'
+        else:
+            print('Memmap is not used, MedCPT embeddings are loaded to RAM.')
         
         self.medcpt_fpath = Path(medcpt_fpath)
         
@@ -22,27 +29,50 @@ class MedCPTNumpyEmbeddings:
 
         assert len(self.pmids_chunk_json_flist) == len(self.emb_chunk_np_flist)
         
-        self.open_np_chunks()
-        self.open_json_chunks(n_jobs=json_read_n_jobs)
+        self.open_np_chunks(n_jobs=read_n_jobs)
+        self.open_json_chunks(n_jobs=read_n_jobs)
         tqdm._instances.clear()
         self.construct_lookup_dict()
         
         return None
     
-    def open_np_chunks(self):
+    def open_single_np_chunk(self, fname):
         
-        emb_chunks_dict = dict()
+        k = fname.stem.split('_')[-1]
+        v = np.load(
+            fname,
+            mmap_mode=self.memmap,
+        )
+        
+        return (k,v)
+    
+    def open_np_chunks(self, n_jobs):
+        
+        #emb_chunks_dict = dict()
 
-        for fname in tqdm(
-            self.emb_chunk_np_flist,
-            desc='Opening np chunks'
-        ):
-            k = fname.stem.split('_')[-1]
-            v = np.load(
-                fname,
-                mmap_mode='r'
+        # for fname in tqdm(
+        #     self.emb_chunk_np_flist,
+        #     desc='Opening np chunks'
+        # ):
+        #     k = fname.stem.split('_')[-1]
+        #     v = np.load(
+        #         fname,
+        #         mmap_mode=self.memmap,
+        #     )
+        #     emb_chunks_dict[k] = v
+            
+        emb_chunks_np_list = (
+            Parallel(n_jobs=n_jobs)(
+                delayed(self.open_single_np_chunk)(fname) for fname in tqdm(
+                    self.emb_chunk_np_flist,
+                    desc='Opening np chunks'
+                )
             )
-            emb_chunks_dict[k] = v
+        )
+        
+        #for k,v in pmids_chunk_np_list:
+            
+        emb_chunks_dict = dict(emb_chunks_np_list)
         
         self.emb_chunks_dict = emb_chunks_dict
         return None

@@ -15,7 +15,7 @@ class np_emb_lookup_table():
         if memmap:
             self.memmap = 'r'
         else:
-            print('Memmap is not used, embeddings are loaded to RAM.')
+            print('Memmap is not used, node embeddings are loaded to RAM.')
         
         self.emb_path = Path(emb_path)
         
