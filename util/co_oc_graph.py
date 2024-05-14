@@ -303,7 +303,7 @@ class MedlineCoocGraph:
 
         return co_oc_pmids_filt_list
     
-    def get_oc_pmids(self, t, sample_size=None) -> list:
+    def get_oc_pmids(self, t, sample_size=None, cut_date=None) -> list:
         """
         Given one term t,
         return list of all PMIDs where it occurs.
@@ -321,8 +321,17 @@ class MedlineCoocGraph:
                 oc_pmid_idx_list
             )
         )
+        
+        if cut_date:
+            oc_pmids_filt_list = []
+            for pmid in oc_pmids_list:
+                yr = self.pmid_to_ts_dict[pmid]
+                if yr <= cut_date:
+                    oc_pmids_filt_list.append(pmid)
+        else:
+            oc_pmids_filt_list = oc_pmids_list
 
-        return oc_pmids_list
+        return oc_pmids_filt_list
     
     def get_pmid_terms(self, pmid) -> list:
         """
@@ -518,6 +527,7 @@ class MedlineCoocGraph:
         self,
         shortest_path_nodes,
         cut_date=None,
+        print_warnings=False,
     ) -> list:
         """Retrieves all abstract ids along a particular path."""
 
@@ -538,6 +548,8 @@ class MedlineCoocGraph:
                 )
             )
             abstr_ids_dict[edge] = current_edge_pmids
+            if print_warnings and len(current_edge_pmids) == 0 and cut_date:
+                print(f'co-oc graph warning: {edge} contains no pmids at cut date: {cut_date}.')
 
         return abstr_ids_dict
     
