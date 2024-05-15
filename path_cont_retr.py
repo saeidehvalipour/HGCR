@@ -84,13 +84,19 @@ class PathContextRetrieval():
         
         return None
     
-    def init_pmid_emb(self):
+    def init_pmid_emb(self, memmap=True):
         print('Init context embeddings...')
         self.medcpt_emb_obj = MedCPTNumpyEmbeddings(
             medcpt_fpath=self.config_dict['pmid_emb_path'],
+            memmap=memmap,
         )
         
-    def get_path_cont_emb(self, path, sampling_rate_abstr_per_edge):
+    def get_path_cont_emb(
+        self,
+        path,
+        sampling_rate_abstr_per_edge,
+        return_context_pmids=False,
+    ):
 
         pmids_list = []
 
@@ -113,8 +119,13 @@ class PathContextRetrieval():
 
         for pmid in pmids_list:
             emb_list.append(self.medcpt_emb_obj[pmid])
-
-        return torch.tensor(np.vstack(emb_list))
+            
+        emb_pt = torch.tensor(np.vstack(emb_list))
+        
+        if return_context_pmids:
+            return (emb_pt, pmids_list)
+        else:
+            return emb_pt
     
     
     def get_path_node_emb(self, path):
