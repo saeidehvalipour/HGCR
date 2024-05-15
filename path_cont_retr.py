@@ -20,16 +20,31 @@ from util.emb_lookup.medcpt_emb_lookup import MedCPTNumpyEmbeddings
 from util.emb_lookup.node_emb_lookup import np_emb_lookup_table
 
 class PathContextRetrieval():
-    def __init__(self, config_path):
+    def __init__(
+        self,
+        config_path,
+        init_model=True,
+        init_node_emb=True,
+        init_mcg=True,
+        init_pmid_emb=True,
+        load_cui_to_pref_name_dict=True,
+    ):
         
         self.config_dict = json.load(open(config_path))
         
-        self.init_model()
-        self.init_node_emb()
-        self.init_mcg()
-        self.init_pmid_emb()
+        if init_model:
+            self.init_model()
+        if init_node_emb:
+            self.init_node_emb()
+        if init_mcg:
+            self.init_mcg()
+        if init_pmid_emb:
+            self.init_pmid_emb()
         
-        self.cui_to_pref_name_dict = json.load(open(self.config_dict['cui_to_pref_name_path']))
+        if load_cui_to_pref_name_dict:
+            self.cui_to_pref_name_dict = json.load(open(self.config_dict['cui_to_pref_name_path']))
+        else:
+            self.cui_to_pref_name_dict = None
         
         return None
     
@@ -90,9 +105,9 @@ class PathContextRetrieval():
                 raise ValueError(f"Embeddings for PMIDs for edge {edge} are not found.")
 
             if len(pmids_medcpt_list) > sampling_rate_abstr_per_edge:
-                pmids_list += random.sample(pmids, sampling_rate_abstr_per_edge)
+                pmids_list += random.sample(pmids_medcpt_list, sampling_rate_abstr_per_edge)
             else:
-                pmids_list += pmids
+                pmids_list += pmids_medcpt_list
 
         emb_list = []
 
