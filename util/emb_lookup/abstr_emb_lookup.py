@@ -9,7 +9,14 @@ class MedlineNumpyEmbeddings:
         self,
         emb_w_ids_fpath,
         json_read_n_jobs=1,
+        memmap=True,
     ):
+        
+        self.memmap = None
+        if memmap:
+            self.memmap = 'r'
+        else:
+            print('Memmap is not used, Medline embeddings are loaded to RAM.')
         
         self.emb_w_ids_fpath = Path(emb_w_ids_fpath)
         
@@ -44,7 +51,7 @@ class MedlineNumpyEmbeddings:
             k = fname.stem.split('chunk_')[-1].split('__')[0]
             v = np.load(
                 fname,
-                mmap_mode='r'
+                mmap_mode=self.memmap,
             )
             emb_chunks_dict[k] = v
         
