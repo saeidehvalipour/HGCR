@@ -17,6 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 from collections import defaultdict
 
 from util.emb_lookup.medcpt_emb_lookup import MedCPTNumpyEmbeddings
+from util.emb_lookup.abstr_emb_lookup import MedlineNumpyEmbeddings
 from util.emb_lookup.node_emb_lookup import np_emb_lookup_table
 
 class PathContextRetrieval():
@@ -81,15 +82,25 @@ class PathContextRetrieval():
         self.mcg_obj.load_graph(self.config_dict['mcg_path'])
         self.mcg_obj.construct_gt_network()
         self.sp_vocab_set = set(json.load(open(self.config_dict['sp_vocab_path'])))
-        
+        self.mcg_obj.init_edge_mask()
         return None
     
     def init_pmid_emb(self, memmap=True):
         print('Init context embeddings...')
-        self.medcpt_emb_obj = MedCPTNumpyEmbeddings(
-            medcpt_fpath=self.config_dict['pmid_emb_path'],
-            memmap=memmap,
-        )
+        
+        if 'medcpt' in str(self.config_dict['pmid_emb_path']).lower():
+            print('Using MedCPT')
+            self.medcpt_emb_obj = MedCPTNumpyEmbeddings(
+                medcpt_fpath=self.config_dict['pmid_emb_path'],
+                memmap=memmap,
+            )
+        else:
+            print('Using Medline embeddings')
+            self.medcpt_emb_obj = MedlineNumpyEmbeddings(
+                emb_w_ids_fpath=self.config_dict['pmid_emb_path'],
+                json_read_n_jobs=1,
+                memmap=memmap,
+            )
         
     def get_path_cont_emb(
         self,
@@ -194,10 +205,27 @@ class PathContextRetrieval():
         n_eval_runs=5,
         sampling_rate_abstr_per_edge=None,
         n_paths_sample_size=None,
+        perform_filtering=True,
+        remove_trivial_edge=False,
     ):
         
-        short_paths_list = self.find_shortest_paths(source_cui, target_cui)
-        filt_short_paths_list = self.filter_shortest_paths(short_paths_list)
+        if remove_trivial_edge:
+            print(f"Attempting to mask out trivial edge {source_cui} - {target_cui}")
+            # This is a hack because undirected graph in graph-tool is represented as 
+            # a directed graph having bidirectional edges 
+            self.mcg_obj.mask_out_gt_edge(source_cui, target_cui)
+            self.mcg_obj.mask_out_gt_edge(source_cui, target_cui)
+            # END of hack
+            
+            short_paths_list = self.find_shortest_paths(source_cui, target_cui)
+            self.mcg_obj.reset_edge_mask()
+        else:
+            short_paths_list = self.find_shortest_paths(source_cui, target_cui)
+            
+        if perform_filtering:
+            filt_short_paths_list = self.filter_shortest_paths(short_paths_list)
+        else:
+            filt_short_paths_list = short_paths_list
         
         if n_paths_sample_size:
             if len(filt_short_paths_list) > n_paths_sample_size:
@@ -222,6 +250,9 @@ class PathContextRetrieval():
                 print(f'Exception: {e} for path: {p}')
             
         sp_and_score_df = pd.DataFrame(sp_and_score_list)
+        if len(sp_and_score_df) == 0:
+            "No paths found"
+            return None
         sp_and_score_df['score_std'] = sp_and_score_df.drop('path', axis=1).std(axis=1)
         sp_and_score_df['score_mean'] = sp_and_score_df.drop(['path', 'score_std'], axis=1).mean(axis=1)
         sp_and_score_df = sp_and_score_df.sort_values('score_mean', ascending=False)

@@ -38,6 +38,7 @@ class MedlineCoocGraph:
         
         #graph-tool
         self.graph_gt = None
+        self.gt_edge_mask = None
         
         
     def process_ts_pmids_chunk(
@@ -420,6 +421,61 @@ class MedlineCoocGraph:
         
         return None
     
+    def init_edge_mask(self) -> None:
+        """
+        Initializing edge mask in case we need to mask out edges.
+        """
+        self.gt_edge_mask = None
+        self.graph_gt.set_edge_filter(None)
+        
+        cur_edge_mask_np = np.ones(
+            self.graph_gt.num_edges(),
+            dtype=bool
+        )
+        cur_edge_mask_gt = self.graph_gt.new_ep(
+            "bool",
+            vals = cur_edge_mask_np
+        )
+            
+        self.graph_gt.set_edge_filter(cur_edge_mask_gt)
+        
+        self.gt_edge_mask = cur_edge_mask_gt
+        
+        return None
+    
+    def get_gt_edge_index(self, source_cui, target_cui):
+        v1_idx = self.cui_to_int_idx_dict[source_cui]
+        v2_idx = self.cui_to_int_idx_dict[target_cui]
+        g_edge = self.graph_gt.edge(v1_idx, v2_idx)
+        
+        try:
+            edge_idx = self.graph_gt.edge_index[g_edge]
+            #print(f"Edge index: {edge_idx}")
+
+        except Exception as e:
+            print(e, '; (The requested edge does not exist!)')
+            edge_idx = None
+        
+        return edge_idx
+    
+    def mask_out_gt_edge(self, source_cui, target_cui):
+        
+        edge_idx = self.get_gt_edge_index(source_cui, target_cui)
+        
+        if edge_idx is not None:
+            #print(f"Edge index to mask: {edge_idx}")
+            self.graph_gt.get_edge_filter()[0].a[edge_idx] = 0
+        
+        return None
+    
+    def reset_edge_mask(self) -> None:
+        assert self.gt_edge_mask is not None
+        
+        zero_indices = (self.graph_gt.get_edge_filter()[0].a == 0)
+        self.graph_gt.get_edge_filter()[0].a[zero_indices] = 1
+        
+        return None
+
     def find_shortest_paths_idxs_old(
         self,
         source,
